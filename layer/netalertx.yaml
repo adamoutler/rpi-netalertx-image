@@ -70,7 +70,7 @@ mmdebstrap:
       [Service]
       Type=simple
       WorkingDirectory=/opt/netalertx
-      ExecStartPre=/usr/bin/docker compose pull --quiet
+      ExecStartPre=-/usr/bin/docker compose pull --quiet
       ExecStart=/usr/bin/docker compose up --no-log-prefix
       ExecStop=/usr/bin/docker compose down
       Restart=always
@@ -82,3 +82,19 @@ mmdebstrap:
     - chroot $1 systemctl enable netalertx.service
     - |-
       chroot $1 bash -c '{ for i in 1 2; do sleep .2; echo raspberry; done; } | passwd $IGconf_device_user1'
+    - |-
+      echo "Pre-pulling NetAlertX Docker image..."
+      chroot $1 bash -c 'mkdir -p /var/lib/docker && dockerd --storage-driver vfs --data-root /var/lib/docker &
+      DOCKER_PID=$!
+      sleep 5
+      for i in {1..30}; do
+        if docker version >/dev/null 2>&1; then
+          echo "Docker is ready"
+          break
+        fi
+        echo "Waiting for Docker to start... ($i/30)"
+        sleep 2
+      done
+      docker pull $IGconf_netalertx_image || echo "Warning: Failed to pre-pull image, will pull on first boot"
+      kill $DOCKER_PID 2>/dev/null || true
+      wait $DOCKER_PID 2>/dev/null || true'

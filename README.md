@@ -7,9 +7,10 @@ Automated Raspberry Pi OS image builder with Docker and NetAlertX pre-configured
 - 🔧 **Automated GitHub Actions workflow** - Builds images automatically
 - 🐧 **64-bit Raspberry Pi OS** - Optimized for Pi Zero 2W and newer
 - 🐳 **Docker & Docker Compose** - Pre-installed and enabled
-- 📡 **NetAlertX** - Automatically started on boot with Docker Compose from `jokob-sk/netalertx:latest`
+- 📡 **NetAlertX** - Docker image pre-pulled and ready to start immediately on boot
 - 📦 **Compressed releases** - Images compressed with gzip, compatible with Raspberry Pi Imager
 - 🔐 **Default credentials** - Username: `pi`, Password: `raspberry` (change on first login)
+- 🚀 **Fast boot** - NetAlertX starts immediately, no waiting for downloads
 
 ## Quick Start
 
@@ -27,7 +28,7 @@ Automated Raspberry Pi OS image builder with Docker and NetAlertX pre-configured
 3. Boot your Raspberry Pi
 4. Login with username `pi` and password `raspberry`
 5. **Change the default password immediately** using the `passwd` command
-6. NetAlertX will be accessible at `http://<pi-ip>:20211`
+6. NetAlertX will start automatically and be accessible at `http://<pi-ip>:20211` within seconds
 
 ### Build Your Own
 
@@ -66,6 +67,7 @@ The build process uses [rpi-image-gen](https://github.com/raspberrypi/rpi-image-
 6. Applies NetAlertX custom layer:
    - Enables docker.service
    - Creates docker-compose.yml at /opt/netalertx
+   - Pre-pulls NetAlertX Docker image (jokob-sk/netalertx:latest)
    - Creates systemd service to run NetAlertX with Docker Compose
    - Sets default password for pi user
    - Configures auto-start on boot
@@ -76,7 +78,7 @@ The build process uses [rpi-image-gen](https://github.com/raspberrypi/rpi-image-
 
 After booting the image:
 
-1. NetAlertX starts automatically via systemd and Docker Compose
+1. NetAlertX starts automatically within seconds (image is pre-pulled, no downloads needed)
 2. Access the web interface at `http://<raspberry-pi-ip>:20211`
 3. Configuration and data are stored at `/opt/netalertx/data` on the Pi
 4. To manage the service:
