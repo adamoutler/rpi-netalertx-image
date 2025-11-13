@@ -19,10 +19,10 @@ mmdebstrap:
   customize-hooks:
     - chroot $1 systemctl enable docker.service
     - |-
-      cat <<- 'EOF' > $1/usr/local/bin/pull-netalertx.sh
+      cat <<- EOF > $1/usr/local/bin/pull-netalertx.sh
       #!/bin/bash
       # Pull NetAlertX Docker image on first boot
-      docker pull ${IGconf_netalertx_image}
+      docker pull $IGconf_netalertx_image
       EOF
     - chmod +x $1/usr/local/bin/pull-netalertx.sh
     - |-
