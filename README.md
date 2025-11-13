@@ -7,10 +7,11 @@ Automated Raspberry Pi OS image builder with Docker and NetAlertX pre-configured
 - 🔧 **Automated GitHub Actions workflow** - Builds images automatically
 - 🐧 **64-bit Raspberry Pi OS** - Optimized for Pi Zero 2W and newer
 - 🐳 **Docker & Docker Compose** - Pre-installed and enabled
-- 📡 **NetAlertX** - Docker image pre-pulled and ready to start immediately on boot
+- 📡 **NetAlertX** - Production or dev image from GitHub Container Registry pre-pulled and ready
 - 📦 **Compressed releases** - Images compressed with gzip, compatible with Raspberry Pi Imager
 - 🔐 **Default credentials** - Username: `pi`, Password: `raspberry` (change on first login)
 - 🚀 **Fast boot** - NetAlertX starts immediately, no waiting for downloads
+- 🔄 **Production or Dev** - Choose between stable production or latest dev builds
 
 ## Quick Start
 
@@ -32,7 +33,18 @@ Automated Raspberry Pi OS image builder with Docker and NetAlertX pre-configured
 
 ### Build Your Own
 
-The workflow is fully automated - just push to main or trigger manually. No configuration needed for basic builds.
+The workflow is fully automated:
+- **Push to main** - Builds with production image (ghcr.io/jokob-sk/netalertx:latest)
+- **Manual trigger** - Choose between production or dev variant:
+  - Production: `ghcr.io/jokob-sk/netalertx:latest` (stable)
+  - Dev: `ghcr.io/jokob-sk/netalertx-dev:latest` (latest features)
+
+To trigger manually with dev image:
+1. Go to Actions tab
+2. Select "Build RPi NetAlertX Image" workflow
+3. Click "Run workflow"
+4. Choose "dev" from the dropdown
+5. Click "Run workflow"
 
 ## Configuration
 
@@ -67,7 +79,8 @@ The build process uses [rpi-image-gen](https://github.com/raspberrypi/rpi-image-
 6. Applies NetAlertX custom layer:
    - Enables docker.service
    - Creates docker-compose.yml at /opt/netalertx
-   - Pre-pulls NetAlertX Docker image (jokob-sk/netalertx:latest)
+   - Pre-pulls NetAlertX Docker image from GitHub Container Registry
+   - Uses production (ghcr.io/jokob-sk/netalertx:latest) or dev (ghcr.io/jokob-sk/netalertx-dev:latest) variant
    - Creates systemd service to run NetAlertX with Docker Compose
    - Sets default password for pi user
    - Configures auto-start on boot

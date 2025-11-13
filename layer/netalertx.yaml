@@ -9,8 +9,8 @@
 #
 # X-Env-VarPrefix: netalertx
 #
-# X-Env-Var-image: jokob-sk/netalertx:latest
-# X-Env-Var-image-Desc: Docker image to use for NetAlertX
+# X-Env-Var-image: ghcr.io/jokob-sk/netalertx:latest
+# X-Env-Var-image-Desc: Docker image to use for NetAlertX (production: ghcr.io/jokob-sk/netalertx:latest or dev: ghcr.io/jokob-sk/netalertx-dev:latest)
 # X-Env-Var-image-Required: false
 # X-Env-Var-image-Set: true
 #
