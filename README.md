@@ -7,7 +7,7 @@ Automated Raspberry Pi OS image builder with Docker and NetAlertX pre-configured
 - 🔧 **Automated GitHub Actions workflow** - Builds images automatically
 - 🐧 **64-bit Raspberry Pi OS** (Debian Bookworm) - Optimized for Pi Zero 2W+
 - 🐳 **Docker & Docker Compose** - Pre-installed and enabled
-- 📡 **NetAlertX** - Automatically pulled on first boot from `jokob-sk/netalertx:latest`
+- 📡 **NetAlertX** - Automatically started on boot with Docker Compose from `jokob-sk/netalertx:latest`
 - 📦 **Compressed releases** - Images compressed with xz for faster downloads
 - 🔐 **Optional user credentials** - Support for GitHub Secrets or default configuration
 
@@ -23,7 +23,7 @@ Automated Raspberry Pi OS image builder with Docker and NetAlertX pre-configured
    sudo dd if=netalertx-rpi.img of=/dev/sdX bs=4M status=progress && sync
    ```
 5. Boot your Raspberry Pi
-6. NetAlertX Docker image will be pulled automatically on first boot
+6. NetAlertX will automatically start and be accessible at `http://<pi-ip>:20211`
 
 ### Option 2: Build Your Own
 
@@ -64,8 +64,9 @@ The build process uses [rpi-image-gen](https://github.com/raspberrypi/rpi-image-
 5. Adds Docker layer (`docker-debian-bookworm`)
 6. Applies NetAlertX custom layer:
    - Enables docker.service
-   - Creates systemd service to pull NetAlertX on first boot
-   - Configures auto-start
+   - Creates docker-compose.yml at /opt/netalertx
+   - Creates systemd service to run NetAlertX with Docker Compose
+   - Configures auto-start on boot
 7. Compresses the final image with xz
 8. Creates a GitHub Release with the compressed image
 
@@ -73,12 +74,26 @@ The build process uses [rpi-image-gen](https://github.com/raspberrypi/rpi-image-
 
 After booting the image:
 
-1. NetAlertX will be automatically pulled on first boot (this may take a few minutes)
-2. You can start NetAlertX using:
+1. NetAlertX starts automatically via systemd and Docker Compose
+2. Access the web interface at `http://<raspberry-pi-ip>:20211`
+3. Configuration and data are stored at `/opt/netalertx/data` on the Pi
+4. To manage the service:
    ```bash
-   docker run -d --name netalertx jokob-sk/netalertx:latest
+   # Check status
+   sudo systemctl status netalertx
+   
+   # View logs
+   sudo docker logs netalertx
+   
+   # Restart service
+   sudo systemctl restart netalertx
+   
+   # Pull latest image and restart
+   cd /opt/netalertx
+   sudo docker compose pull
+   sudo docker compose up -d
    ```
-3. Or create your own docker-compose configuration
+5. The docker-compose configuration is at `/opt/netalertx/docker-compose.yml`
 
 ## Supported Devices
 

@@ -1,7 +1,7 @@
 # METABEGIN
 # X-Env-Layer-Name: netalertx
 # X-Env-Layer-Category: application
-# X-Env-Layer-Desc: NetAlertX monitoring system with Docker
+# X-Env-Layer-Desc: NetAlertX monitoring system with Docker Compose
 # X-Env-Layer-Version: 1.0.0
 # X-Env-Layer-Requires: docker-debian-bookworm
 #
@@ -10,38 +10,74 @@
 # X-Env-VarPrefix: netalertx
 #
 # X-Env-Var-image: jokob-sk/netalertx:latest
-# X-Env-Var-image-Desc: Docker image to pull for NetAlertX
+# X-Env-Var-image-Desc: Docker image to use for NetAlertX
 # X-Env-Var-image-Required: false
 # X-Env-Var-image-Set: true
+#
+# X-Env-Var-port: 20211
+# X-Env-Var-port-Desc: Port for NetAlertX web interface
+# X-Env-Var-port-Required: false
+# X-Env-Var-port-Set: true
 # METAEND
 ---
 mmdebstrap:
   customize-hooks:
     - chroot $1 systemctl enable docker.service
+    - mkdir -p $1/opt/netalertx
     - |-
-      cat <<- EOF > $1/usr/local/bin/pull-netalertx.sh
-      #!/bin/bash
-      # Pull NetAlertX Docker image on first boot
-      docker pull $IGconf_netalertx_image
+      cat <<- EOF > $1/opt/netalertx/docker-compose.yml
+      services:
+        netalertx:
+          network_mode: host
+          image: $IGconf_netalertx_image
+          container_name: netalertx
+          restart: unless-stopped
+          cap_drop:
+            - ALL
+          cap_add:
+            - NET_ADMIN
+            - NET_RAW
+            - NET_BIND_SERVICE
+          volumes:
+            - /opt/netalertx/data:/data:rw
+            - /etc/localtime:/etc/localtime:ro
+          tmpfs:
+            - /tmp:uid=20211,gid=20211,mode=1700,rw,noexec,nosuid,nodev
+          environment:
+            - LISTEN_ADDR=0.0.0.0
+            - PORT=$IGconf_netalertx_port
+            - ALWAYS_FRESH_INSTALL=false
+            - NETALERTX_DEBUG=0
+          mem_limit: 2048m
+          mem_reservation: 1024m
+          cpu_shares: 512
+          pids_limit: 512
+          logging:
+            driver: json-file
+            options:
+              max-size: 10m
+              max-file: "3"
       EOF
-    - chmod +x $1/usr/local/bin/pull-netalertx.sh
+    - mkdir -p $1/opt/netalertx/data
     - |-
-      cat <<- 'EOF' > $1/etc/systemd/system/netalertx-pull.service
+      cat <<- 'EOF' > $1/etc/systemd/system/netalertx.service
       [Unit]
-      Description=Pull NetAlertX Docker Image
+      Description=NetAlertX Network Monitoring
+      Requires=docker.service
       After=docker.service network-online.target
       Wants=network-online.target
-      ConditionPathExists=!/var/lib/netalertx/.image-pulled
       
       [Service]
       Type=oneshot
-      ExecStartPre=/bin/sleep 10
-      ExecStart=/usr/local/bin/pull-netalertx.sh
-      ExecStartPost=/bin/mkdir -p /var/lib/netalertx
-      ExecStartPost=/bin/touch /var/lib/netalertx/.image-pulled
       RemainAfterExit=yes
+      WorkingDirectory=/opt/netalertx
+      ExecStartPre=/usr/bin/docker compose pull
+      ExecStart=/usr/bin/docker compose up -d
+      ExecStop=/usr/bin/docker compose down
+      ExecReload=/usr/bin/docker compose pull
+      ExecReload=/usr/bin/docker compose up -d
       
       [Install]
       WantedBy=multi-user.target
       EOF
-    - chroot $1 systemctl enable netalertx-pull.service
+    - chroot $1 systemctl enable netalertx.service

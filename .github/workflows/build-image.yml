@@ -44,19 +44,16 @@ jobs:
             fdisk \
             dosfstools \
             mtools \
-            rsync
+            rsync \
+            mmdebstrap \
+            genimage \
+            podman
           
-          # Install mmdebstrap and bdebstrap
-          sudo apt-get install -y mmdebstrap bdebstrap || {
-            echo "Installing bdebstrap from pip as backup"
-            sudo pip3 install bdebstrap || echo "bdebstrap installation skipped"
+          # Install bdebstrap
+          sudo apt-get install -y bdebstrap || {
+            echo "bdebstrap not available in apt, installing from pip"
+            sudo pip3 install bdebstrap
           }
-          
-          # Install genimage
-          sudo apt-get install -y genimage || echo "genimage not in repos"
-          
-          # Install podman for namespace handling
-          sudo apt-get install -y podman podman-compose || echo "Podman installation failed, continuing anyway"
       
       - name: Clone rpi-image-gen
         run: |
@@ -90,6 +87,7 @@ jobs:
           export IGconf_device_pass1="${{ secrets.FIRST_USER_PASS || '' }}"
           export IGconf_docker_trust_user1="y"
           export IGconf_netalertx_image="jokob-sk/netalertx:latest"
+          export IGconf_netalertx_port="20211"
           
           # If no password is provided, we'll skip setting one and rely on SSH key auth
           if [ -z "$IGconf_device_pass1" ]; then
