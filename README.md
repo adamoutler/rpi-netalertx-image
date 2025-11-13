@@ -8,7 +8,7 @@ Automated Raspberry Pi OS image builder with Docker and NetAlertX pre-configured
 - 🐧 **64-bit Raspberry Pi OS** (Debian Bookworm) - Optimized for Pi Zero 2W+
 - 🐳 **Docker & Docker Compose** - Pre-installed and enabled
 - 📡 **NetAlertX** - Automatically started on boot with Docker Compose from `jokob-sk/netalertx:latest`
-- 📦 **Compressed releases** - Images compressed with xz for faster downloads
+- 📦 **Compressed releases** - Images compressed with gzip, compatible with Raspberry Pi Imager
 - 🔐 **Optional user credentials** - Support for GitHub Secrets or default configuration
 
 ## Quick Start
@@ -16,14 +16,18 @@ Automated Raspberry Pi OS image builder with Docker and NetAlertX pre-configured
 ### Option 1: Download Pre-built Image
 
 1. Go to the [Releases](../../releases) page
-2. Download the latest `netalertx-rpi.img.xz`
-3. Extract: `xz -d netalertx-rpi.img.xz`
-4. Flash to SD card using [Raspberry Pi Imager](https://www.raspberrypi.com/software/) or `dd`:
+2. Download the latest `netalertx-rpi.img.gz`
+3. Flash to SD card using [Raspberry Pi Imager](https://www.raspberrypi.com/software/) (supports .img.gz directly):
    ```bash
+   # Option 1: Use Raspberry Pi Imager (recommended)
+   # Select "Use custom" and choose the .img.gz file - no need to extract
+   
+   # Option 2: Extract and use dd
+   gunzip netalertx-rpi.img.gz
    sudo dd if=netalertx-rpi.img of=/dev/sdX bs=4M status=progress && sync
    ```
-5. Boot your Raspberry Pi
-6. NetAlertX will automatically start and be accessible at `http://<pi-ip>:20211`
+4. Boot your Raspberry Pi
+5. NetAlertX will automatically start and be accessible at `http://<pi-ip>:20211`
 
 ### Option 2: Build Your Own
 
