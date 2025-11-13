@@ -5,49 +5,46 @@ Automated Raspberry Pi OS image builder with Docker and NetAlertX pre-configured
 ## Features
 
 - 🔧 **Automated GitHub Actions workflow** - Builds images automatically
-- 🐧 **64-bit Raspberry Pi OS** (Debian Bookworm) - Optimized for Pi Zero 2W+
+- 🐧 **64-bit Raspberry Pi OS** - Optimized for Pi Zero 2W and newer
 - 🐳 **Docker & Docker Compose** - Pre-installed and enabled
 - 📡 **NetAlertX** - Automatically started on boot with Docker Compose from `jokob-sk/netalertx:latest`
 - 📦 **Compressed releases** - Images compressed with gzip, compatible with Raspberry Pi Imager
-- 🔐 **Optional user credentials** - Support for GitHub Secrets or default configuration
+- 🔐 **Default credentials** - Username: `pi`, Password: `raspberry` (change on first login)
 
 ## Quick Start
 
-### Option 1: Download Pre-built Image
+### Download Pre-built Image
 
-1. Go to the [Releases](../../releases) page
-2. Download the latest `netalertx-rpi.img.gz`
-3. Flash to SD card using [Raspberry Pi Imager](https://www.raspberrypi.com/software/) (supports .img.gz directly):
-   ```bash
-   # Option 1: Use Raspberry Pi Imager (recommended)
-   # Select "Use custom" and choose the .img.gz file - no need to extract
-   
-   # Option 2: Extract and use dd
-   gunzip netalertx-rpi.img.gz
-   sudo dd if=netalertx-rpi.img of=/dev/sdX bs=4M status=progress && sync
-   ```
-4. Boot your Raspberry Pi
-5. NetAlertX will automatically start and be accessible at `http://<pi-ip>:20211`
+1. Go to the [Releases](../../releases) page and download the latest `.img.gz` file
+2. Flash to SD card using Raspberry Pi Imager:
 
-### Option 2: Build Your Own
+**In Raspberry Pi Imager:**
+1. Select your Raspberry Pi
+2. Select the downloaded image: Operating System -> Use Custom -> the downloaded file
+3. Select the SD card to flash
+4. Press Next and proceed through the process
 
-1. Fork this repository
-2. (Optional) Set up GitHub Secrets for custom credentials:
-   - `FIRST_USER_NAME` - Default: `pi`
-   - `FIRST_USER_PASS` - Default: empty (you'll need to configure auth manually)
-3. Push to `main` branch or manually trigger the workflow
-4. Download the generated image from the Releases page
+3. Boot your Raspberry Pi
+4. Login with username `pi` and password `raspberry`
+5. **Change the default password immediately** using the `passwd` command
+6. NetAlertX will be accessible at `http://<pi-ip>:20211`
+
+### Build Your Own
+
+The workflow is fully automated - just push to main or trigger manually. No configuration needed for basic builds.
 
 ## Configuration
 
 ### Image Specifications
 
-- **Base OS**: Debian Bookworm (64-bit)
+- **Base OS**: Raspberry Pi OS (64-bit)
 - **Device Support**: Raspberry Pi 3, 3+, 4, 400, Zero 2W, 5
 - **Boot Partition**: 256MB
-- **Root Partition**: 2GB (will expand on first boot)
+- **Root Partition**: 2GB (auto-expands on first boot)
 - **Docker**: Latest from Docker CE repository
 - **Docker Compose**: Included as Docker plugin
+- **Default User**: pi
+- **Default Password**: raspberry
 
 ### Customization
 
@@ -64,14 +61,15 @@ The build process uses [rpi-image-gen](https://github.com/raspberrypi/rpi-image-
 1. GitHub Actions runner installs dependencies (qemu, mmdebstrap, etc.)
 2. Clones rpi-image-gen repository
 3. Applies custom configuration and layers
-4. Builds the image using `bookworm-minbase` base layer
+4. Builds the image using Raspberry Pi OS base
 5. Adds Docker layer (`docker-debian-bookworm`)
 6. Applies NetAlertX custom layer:
    - Enables docker.service
    - Creates docker-compose.yml at /opt/netalertx
    - Creates systemd service to run NetAlertX with Docker Compose
+   - Sets default password for pi user
    - Configures auto-start on boot
-7. Compresses the final image with xz
+7. Compresses the final image with gzip
 8. Creates a GitHub Release with the compressed image
 
 ## NetAlertX Configuration
@@ -109,9 +107,9 @@ After booting the image:
 
 ## Security Notes
 
-- Default images have login disabled by default (following rpi-image-gen defaults)
-- Configure SSH keys or use the Raspberry Pi Imager to set credentials before first boot
-- Or set `FIRST_USER_NAME` and `FIRST_USER_PASS` secrets for automated builds
+- **Default password is `raspberry`** - Change it immediately on first login using `passwd`
+- Docker service runs automatically and NetAlertX has host network access
+- NetAlertX data is persisted at `/opt/netalertx/data`
 
 ## License
 

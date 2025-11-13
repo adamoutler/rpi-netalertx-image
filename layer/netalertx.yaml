@@ -68,16 +68,17 @@ mmdebstrap:
       Wants=network-online.target
       
       [Service]
-      Type=oneshot
-      RemainAfterExit=yes
+      Type=simple
       WorkingDirectory=/opt/netalertx
-      ExecStartPre=/usr/bin/docker compose pull
-      ExecStart=/usr/bin/docker compose up -d
+      ExecStartPre=/usr/bin/docker compose pull --quiet
+      ExecStart=/usr/bin/docker compose up --no-log-prefix
       ExecStop=/usr/bin/docker compose down
-      ExecReload=/usr/bin/docker compose pull
-      ExecReload=/usr/bin/docker compose up -d
+      Restart=always
+      RestartSec=10
       
       [Install]
       WantedBy=multi-user.target
       EOF
     - chroot $1 systemctl enable netalertx.service
+    - |-
+      chroot $1 bash -c '{ for i in 1 2; do sleep .2; echo raspberry; done; } | passwd $IGconf_device_user1'
