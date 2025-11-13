@@ -1,0 +1,139 @@
+name: Build RPi NetAlertX Image
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-image:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          df -h
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            qemu-user-static \
+            binfmt-support \
+            debootstrap \
+            debian-archive-keyring \
+            systemd-container \
+            xz-utils \
+            python3 \
+            python3-yaml \
+            curl \
+            git
+          
+          # Install mmdebstrap
+          sudo apt-get install -y mmdebstrap
+          
+          # Install genimage
+          sudo apt-get install -y genimage || echo "genimage not in repos, will build from source if needed"
+          
+          # Install podman if available, otherwise use docker
+          sudo apt-get install -y podman || echo "Using docker instead of podman"
+      
+      - name: Clone rpi-image-gen
+        run: |
+          git clone https://github.com/raspberrypi/rpi-image-gen.git
+          cd rpi-image-gen
+          git log -1 --oneline
+      
+      - name: Copy configuration files to rpi-image-gen
+        run: |
+          cp -r config rpi-image-gen/
+          cp -r layer rpi-image-gen/
+          if [ -d layer-hooks ]; then
+            cp -r layer-hooks rpi-image-gen/
+          fi
+      
+      - name: Build RPi image
+        run: |
+          cd rpi-image-gen
+          
+          # Set environment variables for user credentials if provided
+          export IGconf_device_user1="${{ secrets.FIRST_USER_NAME || 'pi' }}"
+          export IGconf_device_pass1="${{ secrets.FIRST_USER_PASS || '' }}"
+          
+          # If no password is provided, we'll skip setting one and rely on SSH key auth
+          if [ -z "$IGconf_device_pass1" ]; then
+            echo "No password provided, user will need to configure authentication manually"
+          fi
+          
+          # Build the image
+          ./rpi-image-gen build -c ./config/netalertx.yaml
+          
+          # Find the generated image
+          IMAGE_PATH=$(find ./work -name "*.img" -type f | head -n 1)
+          echo "Generated image: $IMAGE_PATH"
+          
+          if [ -z "$IMAGE_PATH" ]; then
+            echo "Error: No image file generated"
+            exit 1
+          fi
+          
+          # Get image info
+          ls -lh "$IMAGE_PATH"
+          
+          # Move to workspace root for easier access
+          cp "$IMAGE_PATH" ../netalertx-rpi.img
+      
+      - name: Compress image with xz
+        run: |
+          echo "Compressing image with xz..."
+          xz -9 -v netalertx-rpi.img
+          ls -lh netalertx-rpi.img.xz
+      
+      - name: Generate release tag
+        id: tag
+        run: |
+          TAG="v$(date +'%Y.%m.%d')-$(git rev-parse --short HEAD)"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Release tag: $TAG"
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: NetAlertX RPi Image ${{ steps.tag.outputs.tag }}
+          body: |
+            # NetAlertX Raspberry Pi Image
+            
+            This is an automated build of a Raspberry Pi OS 64-bit image for Zero 2W and newer devices, pre-configured with:
+            - Docker & Docker Compose
+            - NetAlertX (jokob-sk/netalertx:latest) - pulled on first boot
+            
+            ## Installation
+            1. Download `netalertx-rpi.img.xz`
+            2. Extract: `xz -d netalertx-rpi.img.xz`
+            3. Flash to SD card using Raspberry Pi Imager or dd
+            4. Boot your Raspberry Pi
+            5. Docker will automatically pull NetAlertX on first boot
+            
+            ## Configuration
+            - Default user: pi (or custom if FIRST_USER_NAME secret was set)
+            - Docker service is enabled and starts automatically
+            - NetAlertX image is pulled automatically on first boot
+            
+            Built from commit: ${{ github.sha }}
+          files: |
+            netalertx-rpi.img.xz
+          draft: false
+          prerelease: false

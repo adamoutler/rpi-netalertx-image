@@ -1,0 +1,47 @@
+# METABEGIN
+# X-Env-Layer-Name: netalertx
+# X-Env-Layer-Category: application
+# X-Env-Layer-Desc: NetAlertX monitoring system with Docker
+# X-Env-Layer-Version: 1.0.0
+# X-Env-Layer-Requires: docker-debian-bookworm
+#
+# X-Env-VarRequires: IGconf_device_user1
+#
+# X-Env-VarPrefix: netalertx
+#
+# X-Env-Var-image: jokob-sk/netalertx:latest
+# X-Env-Var-image-Desc: Docker image to pull for NetAlertX
+# X-Env-Var-image-Required: false
+# X-Env-Var-image-Set: true
+# METAEND
+---
+mmdebstrap:
+  customize-hooks:
+    - chroot $1 systemctl enable docker.service
+    - |-
+      cat <<- 'EOF' > $1/usr/local/bin/pull-netalertx.sh
+      #!/bin/bash
+      # Pull NetAlertX Docker image on first boot
+      docker pull ${IGconf_netalertx_image}
+      EOF
+    - chmod +x $1/usr/local/bin/pull-netalertx.sh
+    - |-
+      cat <<- 'EOF' > $1/etc/systemd/system/netalertx-pull.service
+      [Unit]
+      Description=Pull NetAlertX Docker Image
+      After=docker.service network-online.target
+      Wants=network-online.target
+      ConditionPathExists=!/var/lib/netalertx/.image-pulled
+      
+      [Service]
+      Type=oneshot
+      ExecStartPre=/bin/sleep 10
+      ExecStart=/usr/local/bin/pull-netalertx.sh
+      ExecStartPost=/bin/mkdir -p /var/lib/netalertx
+      ExecStartPost=/bin/touch /var/lib/netalertx/.image-pulled
+      RemainAfterExit=yes
+      
+      [Install]
+      WantedBy=multi-user.target
+      EOF
+    - chroot $1 systemctl enable netalertx-pull.service
