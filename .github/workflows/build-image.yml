@@ -39,30 +39,46 @@ jobs:
             python3 \
             python3-yaml \
             curl \
-            git
+            git \
+            fdisk \
+            dosfstools \
+            mtools \
+            rsync
           
-          # Install mmdebstrap
-          sudo apt-get install -y mmdebstrap
+          # Install mmdebstrap and bdebstrap
+          sudo apt-get install -y mmdebstrap bdebstrap || {
+            echo "Installing bdebstrap from pip as backup"
+            sudo pip3 install bdebstrap || echo "bdebstrap installation skipped"
+          }
           
           # Install genimage
-          sudo apt-get install -y genimage || echo "genimage not in repos, will build from source if needed"
+          sudo apt-get install -y genimage || echo "genimage not in repos"
           
-          # Install podman if available, otherwise use docker
-          sudo apt-get install -y podman || echo "Using docker instead of podman"
+          # Install podman for namespace handling
+          sudo apt-get install -y podman podman-compose || echo "Podman installation failed, continuing anyway"
       
       - name: Clone rpi-image-gen
         run: |
           git clone https://github.com/raspberrypi/rpi-image-gen.git
           cd rpi-image-gen
           git log -1 --oneline
+          
+          # Install additional dependencies using their script
+          echo "Installing rpi-image-gen dependencies..."
+          sudo ./install_deps.sh || echo "Some dependencies may have failed, continuing..."
       
       - name: Copy configuration files to rpi-image-gen
         run: |
-          cp -r config rpi-image-gen/
-          cp -r layer rpi-image-gen/
+          cp -rv config rpi-image-gen/
+          cp -rv layer rpi-image-gen/
           if [ -d layer-hooks ]; then
-            cp -r layer-hooks rpi-image-gen/
+            cp -rv layer-hooks rpi-image-gen/
           fi
+          
+          # List what was copied
+          echo "Configuration copied:"
+          ls -la rpi-image-gen/config/
+          ls -la rpi-image-gen/layer/
       
       - name: Build RPi image
         run: |
@@ -71,21 +87,35 @@ jobs:
           # Set environment variables for user credentials if provided
           export IGconf_device_user1="${{ secrets.FIRST_USER_NAME || 'pi' }}"
           export IGconf_device_pass1="${{ secrets.FIRST_USER_PASS || '' }}"
+          export IGconf_docker_trust_user1="y"
+          export IGconf_netalertx_image="jokob-sk/netalertx:latest"
           
           # If no password is provided, we'll skip setting one and rely on SSH key auth
           if [ -z "$IGconf_device_pass1" ]; then
-            echo "No password provided, user will need to configure authentication manually"
+            echo "⚠️  No password provided, user will need to configure authentication manually"
+            echo "    Use Raspberry Pi Imager to set up credentials before first boot"
           fi
           
+          # Show available layers
+          echo "Available layers:"
+          ./rpi-image-gen layer --list | head -20
+          
           # Build the image
-          ./rpi-image-gen build -c ./config/netalertx.yaml
+          echo "Starting image build..."
+          ./rpi-image-gen build -c ./config/netalertx.yaml -S . || {
+            echo "❌ Build failed. Checking for logs..."
+            find . -name "*.log" -exec echo "=== {} ===" \; -exec cat {} \;
+            exit 1
+          }
           
           # Find the generated image
           IMAGE_PATH=$(find ./work -name "*.img" -type f | head -n 1)
-          echo "Generated image: $IMAGE_PATH"
+          echo "✅ Generated image: $IMAGE_PATH"
           
           if [ -z "$IMAGE_PATH" ]; then
-            echo "Error: No image file generated"
+            echo "❌ Error: No image file generated"
+            echo "Checking work directory:"
+            find ./work -type f
             exit 1
           fi
           
