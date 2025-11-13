@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - copilot/create-github-actions-workflow
   workflow_dispatch:
 
 permissions:
