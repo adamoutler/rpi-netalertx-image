@@ -24,6 +24,7 @@ mmdebstrap:
   packages:
     - raspberrypi-archive-keyring
     - raspberrypi-sys-mods
+    - userconf-pi
   customize-hooks:
     # Set up Raspberry Pi APT repository
     - test -f $1/usr/share/keyrings/raspberrypi-archive-keyring.gpg || false
@@ -33,6 +34,11 @@ mmdebstrap:
       deb [signed-by=/usr/share/keyrings/raspberrypi-archive-keyring.gpg] http://archive.raspberrypi.com/debian bookworm main
       EOF
     - sed -i '/archive\.raspberrypi\.com/d' $1/etc/apt/sources.list
+    # Ensure boot partition will be writable for RPi Imager firstrun.sh
+    - mkdir -p $1/boot/firmware
+    # Enable systemd services needed for first-boot configuration
+    - chroot $1 systemctl enable userconfig.service || true
+    - chroot $1 systemctl enable regenerate_ssh_host_keys.service || true
     # Enable Docker service
     - chroot $1 systemctl enable docker.service
     # Create NetAlertX docker-compose configuration
