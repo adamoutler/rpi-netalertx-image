@@ -19,10 +19,23 @@
 # METAEND
 ---
 mmdebstrap:
+  mirrors:
+    - deb http://archive.raspberrypi.com/debian bookworm main
   packages:
+    - raspberrypi-archive-keyring
     - raspberrypi-sys-mods
   customize-hooks:
+    # Set up Raspberry Pi APT repository
+    - test -f $1/usr/share/keyrings/raspberrypi-archive-keyring.gpg || false
+    - mkdir -p $1/etc/apt/sources.list.d
+    - |-
+      cat <<- EOF > $1/etc/apt/sources.list.d/raspberrypi.list
+      deb [signed-by=/usr/share/keyrings/raspberrypi-archive-keyring.gpg] http://archive.raspberrypi.com/debian bookworm main
+      EOF
+    - sed -i '/archive\.raspberrypi\.com/d' $1/etc/apt/sources.list
+    # Enable Docker service
     - chroot $1 systemctl enable docker.service
+    # Create NetAlertX docker-compose configuration
     - mkdir -p $1/opt/netalertx
     - |-
       cat <<- EOF > $1/opt/netalertx/docker-compose.yml

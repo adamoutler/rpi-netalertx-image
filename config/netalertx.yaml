@@ -10,7 +10,4 @@ image:
 
 layer:
   base: bookworm-minbase
-  # Include RPI-specific packages for first-boot configuration
-  extra:
-    - rpi-debian-bookworm
   custom: netalertx
