@@ -9,8 +9,8 @@
 #
 # X-Env-VarPrefix: netalertx
 #
-# X-Env-Var-image: ghcr.io/jokob-sk/netalertx:latest
-# X-Env-Var-image-Desc: Docker image to use for NetAlertX (production: ghcr.io/jokob-sk/netalertx:latest or dev: ghcr.io/jokob-sk/netalertx-dev:latest)
+# X-Env-Var-image: ghcr.io/jokob-sk/netalertx-dev:latest
+# X-Env-Var-image-Desc: Docker image to use for NetAlertX (dev: ghcr.io/jokob-sk/netalertx-dev:latest or production: ghcr.io/jokob-sk/netalertx:latest)
 # X-Env-Var-image-Required: false
 # X-Env-Var-image-Set: true
 #
@@ -32,6 +32,7 @@ mmdebstrap:
           image: $IGconf_netalertx_image
           container_name: netalertx
           restart: unless-stopped
+          read_only: true
           cap_drop:
             - ALL
           cap_add:
@@ -39,7 +40,7 @@ mmdebstrap:
             - NET_RAW
             - NET_BIND_SERVICE
           volumes:
-            - /opt/netalertx/data:/data:rw
+            - netalertx_data:/data:rw
             - /etc/localtime:/etc/localtime:ro
           tmpfs:
             - /tmp:uid=20211,gid=20211,mode=1700,rw,noexec,nosuid,nodev
@@ -57,8 +58,10 @@ mmdebstrap:
             options:
               max-size: 10m
               max-file: "3"
+      
+      volumes:
+        netalertx_data:
       EOF
-    - mkdir -p $1/opt/netalertx/data
     - |-
       cat <<- 'EOF' > $1/etc/systemd/system/netalertx.service
       [Unit]
@@ -80,8 +83,6 @@ mmdebstrap:
       WantedBy=multi-user.target
       EOF
     - chroot $1 systemctl enable netalertx.service
-    - |-
-      chroot $1 bash -c '{ for i in 1 2; do sleep .2; echo raspberry; done; } | passwd $IGconf_device_user1'
     - |-
       echo "Pre-pulling NetAlertX Docker image..."
       chroot $1 bash -c 'mkdir -p /var/lib/docker && dockerd --storage-driver vfs --data-root /var/lib/docker &

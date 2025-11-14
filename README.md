@@ -7,11 +7,12 @@ Automated Raspberry Pi OS image builder with Docker and NetAlertX pre-configured
 - 🔧 **Automated GitHub Actions workflow** - Builds images automatically
 - 🐧 **64-bit Raspberry Pi OS** - Optimized for Pi Zero 2W and newer
 - 🐳 **Docker & Docker Compose** - Pre-installed and enabled
-- 📡 **NetAlertX** - Production or dev image from GitHub Container Registry pre-pulled and ready
+- 📡 **NetAlertX** - Dev or production image from GitHub Container Registry pre-pulled and ready
 - 📦 **Compressed releases** - Images compressed with gzip, compatible with Raspberry Pi Imager
-- 🔐 **Default credentials** - Username: `pi`, Password: `raspberry` (change on first login)
+- 🔐 **RPi Imager configuration** - Use Raspberry Pi Imager to set username, password, and WiFi
 - 🚀 **Fast boot** - NetAlertX starts immediately, no waiting for downloads
-- 🔄 **Production or Dev** - Choose between stable production or latest dev builds
+- 🔄 **Dev or Production** - Dev builds by default, choose production if needed
+- 🔒 **Read-only container** - Secure configuration with read-only filesystem
 
 ## Quick Start
 
@@ -24,26 +25,28 @@ Automated Raspberry Pi OS image builder with Docker and NetAlertX pre-configured
 1. Select your Raspberry Pi
 2. Select the downloaded image: Operating System -> Use Custom -> the downloaded file
 3. Select the SD card to flash
-4. Press Next and proceed through the process
+4. Click the gear icon (⚙️) or press Ctrl+Shift+X to configure:
+   - Set username and password
+   - Configure WiFi credentials
+   - Enable SSH if desired
+5. Press Next and proceed through the process
 
 3. Boot your Raspberry Pi
-4. Login with username `pi` and password `raspberry`
-5. **Change the default password immediately** using the `passwd` command
-6. NetAlertX will start automatically and be accessible at `http://<pi-ip>:20211` within seconds
+4. NetAlertX will start automatically and be accessible at `http://<pi-ip>:20211` within seconds
 
 ### Build Your Own
 
 The workflow is fully automated:
-- **Push to main** - Builds with production image (ghcr.io/jokob-sk/netalertx:latest)
-- **Manual trigger** - Choose between production or dev variant:
+- **Push to main** - Builds with dev image (ghcr.io/jokob-sk/netalertx-dev:latest) by default
+- **Manual trigger** - Choose between dev or production variant:
+  - Dev: `ghcr.io/jokob-sk/netalertx-dev:latest` (latest features, default)
   - Production: `ghcr.io/jokob-sk/netalertx:latest` (stable)
-  - Dev: `ghcr.io/jokob-sk/netalertx-dev:latest` (latest features)
 
-To trigger manually with dev image:
+To trigger manually with production image:
 1. Go to Actions tab
 2. Select "Build RPi NetAlertX Image" workflow
 3. Click "Run workflow"
-4. Choose "dev" from the dropdown
+4. Choose "production" from the dropdown
 5. Click "Run workflow"
 
 ## Configuration
@@ -56,8 +59,8 @@ To trigger manually with dev image:
 - **Root Partition**: 2GB (auto-expands on first boot)
 - **Docker**: Latest from Docker CE repository
 - **Docker Compose**: Included as Docker plugin
-- **Default User**: pi
-- **Default Password**: raspberry
+- **Authentication**: Configure using Raspberry Pi Imager (username, password, WiFi, SSH)
+- **NetAlertX Data**: Stored in Docker named volume `netalertx_data`
 
 ### Customization
 
@@ -78,11 +81,11 @@ The build process uses [rpi-image-gen](https://github.com/raspberrypi/rpi-image-
 5. Adds Docker layer (`docker-debian-bookworm`)
 6. Applies NetAlertX custom layer:
    - Enables docker.service
-   - Creates docker-compose.yml at /opt/netalertx
+   - Creates docker-compose.yml at /opt/netalertx with read-only container
    - Pre-pulls NetAlertX Docker image from GitHub Container Registry
-   - Uses production (ghcr.io/jokob-sk/netalertx:latest) or dev (ghcr.io/jokob-sk/netalertx-dev:latest) variant
+   - Uses dev (ghcr.io/jokob-sk/netalertx-dev:latest) or production (ghcr.io/jokob-sk/netalertx:latest) variant
    - Creates systemd service to run NetAlertX with Docker Compose
-   - Sets default password for pi user
+   - Uses Docker named volume for persistent data
    - Configures auto-start on boot
 7. Compresses the final image with gzip
 8. Creates a GitHub Release with the compressed image
@@ -93,7 +96,7 @@ After booting the image:
 
 1. NetAlertX starts automatically within seconds (image is pre-pulled, no downloads needed)
 2. Access the web interface at `http://<raspberry-pi-ip>:20211`
-3. Configuration and data are stored at `/opt/netalertx/data` on the Pi
+3. Configuration and data are stored in Docker named volume `netalertx_data`
 4. To manage the service:
    ```bash
    # Check status
@@ -122,9 +125,10 @@ After booting the image:
 
 ## Security Notes
 
-- **Default password is `raspberry`** - Change it immediately on first login using `passwd`
-- Docker service runs automatically and NetAlertX has host network access
-- NetAlertX data is persisted at `/opt/netalertx/data`
+- **Configure credentials in Raspberry Pi Imager** - Use the configuration options to set username, password, and WiFi
+- **Read-only container** - NetAlertX runs in a read-only container for enhanced security
+- Docker service runs automatically and NetAlertX has host network access for ARP scanning
+- NetAlertX data is persisted in Docker named volume `netalertx_data`
 
 ## License
 

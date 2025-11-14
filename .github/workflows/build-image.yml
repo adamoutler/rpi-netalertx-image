@@ -10,11 +10,11 @@ on:
       image_variant:
         description: 'NetAlertX variant to use'
         required: false
-        default: 'production'
+        default: 'dev'
         type: choice
         options:
-          - production
           - dev
+          - production
 
 permissions:
   contents: write
@@ -91,14 +91,14 @@ jobs:
         run: |
           cd rpi-image-gen
           
-          # Determine which NetAlertX image to use
-          IMAGE_VARIANT="${{ github.event.inputs.image_variant || 'production' }}"
-          if [ "$IMAGE_VARIANT" = "dev" ]; then
-            NETALERTX_IMAGE="ghcr.io/jokob-sk/netalertx-dev:latest"
-            echo "Using NetAlertX DEV image: $NETALERTX_IMAGE"
-          else
+          # Determine which NetAlertX image to use (default to dev)
+          IMAGE_VARIANT="${{ github.event.inputs.image_variant || 'dev' }}"
+          if [ "$IMAGE_VARIANT" = "production" ]; then
             NETALERTX_IMAGE="ghcr.io/jokob-sk/netalertx:latest"
             echo "Using NetAlertX PRODUCTION image: $NETALERTX_IMAGE"
+          else
+            NETALERTX_IMAGE="ghcr.io/jokob-sk/netalertx-dev:latest"
+            echo "Using NetAlertX DEV image: $NETALERTX_IMAGE"
           fi
           
           # Set environment variables for user credentials if provided
