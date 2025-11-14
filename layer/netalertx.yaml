@@ -25,6 +25,7 @@ mmdebstrap:
     - raspberrypi-archive-keyring
     - raspberrypi-sys-mods
     - userconf-pi
+    - raspi-config
   customize-hooks:
     # Set up Raspberry Pi APT repository
     - test -f $1/usr/share/keyrings/raspberrypi-archive-keyring.gpg || false
@@ -102,19 +103,3 @@ mmdebstrap:
       WantedBy=multi-user.target
       EOF
     - chroot $1 systemctl enable netalertx.service
-    - |-
-      echo "Pre-pulling NetAlertX Docker image..."
-      chroot $1 bash -c 'mkdir -p /var/lib/docker && dockerd --storage-driver vfs --data-root /var/lib/docker &
-      DOCKER_PID=$!
-      sleep 5
-      for i in {1..30}; do
-        if docker version >/dev/null 2>&1; then
-          echo "Docker is ready"
-          break
-        fi
-        echo "Waiting for Docker to start... ($i/30)"
-        sleep 2
-      done
-      docker pull $IGconf_netalertx_image || echo "Warning: Failed to pre-pull image, will pull on first boot"
-      kill $DOCKER_PID 2>/dev/null || true
-      wait $DOCKER_PID 2>/dev/null || true'
