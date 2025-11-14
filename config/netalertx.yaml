@@ -10,4 +10,5 @@ image:
 
 layer:
   base: bookworm-minbase
-  custom: [docker-debian-bookworm, netalertx]
+  custom: netalertx
+  extra: docker-debian-bookworm
