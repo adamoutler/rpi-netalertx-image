@@ -5,8 +5,6 @@
 # X-Env-Layer-Version: 1.0.0
 # X-Env-Layer-Requires: docker-debian-bookworm
 #
-# X-Env-VarRequires: IGconf_device_user1
-#
 # X-Env-VarPrefix: netalertx
 #
 # X-Env-Var-image: ghcr.io/jokob-sk/netalertx-dev:latest
@@ -21,6 +19,8 @@
 # METAEND
 ---
 mmdebstrap:
+  packages:
+    - raspberrypi-sys-mods
   customize-hooks:
     - chroot $1 systemctl enable docker.service
     - mkdir -p $1/opt/netalertx

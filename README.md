@@ -25,14 +25,16 @@ Automated Raspberry Pi OS image builder with Docker and NetAlertX pre-configured
 1. Select your Raspberry Pi
 2. Select the downloaded image: Operating System -> Use Custom -> the downloaded file
 3. Select the SD card to flash
-4. Click the gear icon (⚙️) or press Ctrl+Shift+X to configure:
-   - Set username and password
-   - Configure WiFi credentials
-   - Enable SSH if desired
+4. **IMPORTANT**: Click the gear icon (⚙️) or press Ctrl+Shift+X to configure:
+   - **Set username and password** (required - no default user is configured)
+   - Configure WiFi credentials (optional)
+   - Configure hostname (optional)
+   - Enable SSH if desired (optional)
 5. Press Next and proceed through the process
 
 3. Boot your Raspberry Pi
-4. NetAlertX will start automatically and be accessible at `http://<pi-ip>:20211` within seconds
+4. Login with the username/password you configured in RPi Imager
+5. NetAlertX will start automatically and be accessible at `http://<pi-ip>:20211` within seconds
 
 ### Build Your Own
 
@@ -59,7 +61,8 @@ To trigger manually with production image:
 - **Root Partition**: 2GB (auto-expands on first boot)
 - **Docker**: Latest from Docker CE repository
 - **Docker Compose**: Included as Docker plugin
-- **Authentication**: Configure using Raspberry Pi Imager (username, password, WiFi, SSH)
+- **Authentication**: **Required** - Must configure using Raspberry Pi Imager (no default user)
+- **First Boot**: Raspberry Pi Imager settings are applied automatically (username, password, WiFi, hostname, SSH)
 - **NetAlertX Data**: Stored in Docker named volume `netalertx_data`
 
 ### Customization
