@@ -88,11 +88,16 @@ jobs:
           ls -la rpi-image-gen/layer/
       
       - name: Build RPi image
+        id: build-image
+        env:
+          FIRST_USER_NAME: pi
+          FIRST_USER_PASS: raspberry
+          IMAGE_VARIANT_INPUT: ${{ github.event.inputs.image_variant }}
         run: |
           cd rpi-image-gen
           
           # Determine which NetAlertX image to use (default to dev)
-          IMAGE_VARIANT="${{ github.event.inputs.image_variant || 'dev' }}"
+          IMAGE_VARIANT="${IMAGE_VARIANT_INPUT:-dev}"
           if [ "$IMAGE_VARIANT" = "production" ]; then
             NETALERTX_IMAGE="ghcr.io/jokob-sk/netalertx:latest"
             echo "Using NetAlertX PRODUCTION image: $NETALERTX_IMAGE"
@@ -102,8 +107,11 @@ jobs:
           fi
           
           # Set environment variables for user credentials if provided
-          export IGconf_device_user1="${{ secrets.FIRST_USER_NAME || 'pi' }}"
-          export IGconf_device_pass1="${{ secrets.FIRST_USER_PASS || 'raspberry' }}"
+          # Use secrets for first user if provided, otherwise fallback to defaults
+          IGUSER="${FIRST_USER_NAME:-pi}"
+          IGPASS="${FIRST_USER_PASS:-raspberry}"
+          export IGconf_device_user1="${IGUSER}"
+          export IGconf_device_pass1="${IGPASS}"
           export IGconf_docker_trust_user1="y"
           export IGconf_netalertx_image="$NETALERTX_IMAGE"
           export IGconf_netalertx_port="20211"
@@ -159,12 +167,40 @@ jobs:
           # Move to workspace root with dated filename
           cp "$IMAGE_PATH" "../${IMAGE_NAME}"
           echo "IMAGE_NAME=${IMAGE_NAME}" >> $GITHUB_ENV
+          # Export step output so later steps can reference this file name
+          echo "IMAGE_NAME=${IMAGE_NAME}" >> $GITHUB_OUTPUT
       
       - name: Compress image with gzip
+        id: compress-image
+        env:
+          IMAGE_NAME: ${{ steps.build-image.outputs.IMAGE_NAME }}
         run: |
           echo "Compressing image with gzip..."
           gzip -9 -v "${IMAGE_NAME}"
           ls -lh "${IMAGE_NAME}.gz"
+          echo "ARCHIVE_NAME=${IMAGE_NAME}.gz" >> $GITHUB_OUTPUT
+
+      - name: Verify compressed archive
+        run: |
+          ARCHIVE="${{ steps.compress-image.outputs.ARCHIVE_NAME }}"
+          echo "Checking for archive: $ARCHIVE"
+          if [ -z "$ARCHIVE" ]; then
+            echo "No archive name provided from compress step";
+            ls -lah . || true;
+            exit 1;
+          fi
+          if [ ! -f "$ARCHIVE" ]; then
+            echo "Archive file not found: $ARCHIVE";
+            ls -lah . || true;
+            exit 1;
+          fi
+          echo "Archive verified: $ARCHIVE";
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: netalertx-image
+          path: ${{ steps.compress-image.outputs.ARCHIVE_NAME }}
       
       - name: Generate release tag
         id: tag
@@ -206,6 +242,6 @@ jobs:
             
             Built from commit: ${{ github.sha }}
           files: |
-            ${{ env.IMAGE_NAME }}.gz
+            ${{ steps.compress-image.outputs.ARCHIVE_NAME }}
           draft: false
           prerelease: false
