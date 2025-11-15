@@ -109,8 +109,8 @@ jobs:
           export IGconf_netalertx_port="20211"
           
           # Create and set the APT key directory required by docker layer
-          mkdir -p ./apt-keys
-          export IGconf_sys_apt_keydir="./apt-keys"
+          mkdir -p "$PWD/apt-keys"
+          export IGconf_sys_apt_keydir="$PWD/apt-keys"
           
           echo "Default user '$IGconf_device_user1' will be created."
           echo "Use RPi Imager advanced options to override credentials."
