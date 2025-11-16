@@ -2,249 +2,207 @@ name: Build RPi NetAlertX Image
 
 on:
   push:
-    branches:
-      - main
-      - copilot/create-github-actions-workflow
+    branches: [ main ]
   workflow_dispatch:
     inputs:
       image_variant:
-        description: 'NetAlertX variant to use'
-        required: false
+        description: 'NetAlertX image variant'
+        required: true
         default: 'dev'
         type: choice
         options:
           - dev
           - production
 
-permissions:
-  contents: write
-
 jobs:
-  build-image:
+  build:
     runs-on: ubuntu-latest
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
-      - name: Free up disk space
+
+      - name: Set NetAlertX image based on variant
+        id: set-image
         run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo docker image prune --all --force
-          df -h
-      
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            qemu-user-static \
-            binfmt-support \
-            debootstrap \
-            debian-archive-keyring \
-            systemd-container \
-            xz-utils \
-            python3 \
-            python3-yaml \
-            curl \
-            git \
-            fdisk \
-            dosfstools \
-            mtools \
-            rsync \
-            mmdebstrap \
-            genimage \
-            podman
-          
-          # Install bdebstrap
-          sudo apt-get install -y bdebstrap || {
-            echo "bdebstrap not available in apt, installing from pip"
-            sudo pip3 install bdebstrap
-          }
-      
-      - name: Clone rpi-image-gen
-        run: |
-          git clone https://github.com/raspberrypi/rpi-image-gen.git
-          cd rpi-image-gen
-          git log -1 --oneline
-          
-          # Install additional dependencies using their script
-          echo "Installing rpi-image-gen dependencies..."
-          sudo ./install_deps.sh || echo "Some dependencies may have failed, continuing..."
-      
-      - name: Copy configuration files to rpi-image-gen
-        run: |
-          cp -rv config rpi-image-gen/
-          cp -rv layer rpi-image-gen/
-          if [ -d layer-hooks ]; then
-            cp -rv layer-hooks rpi-image-gen/
-          fi
-          
-          # List what was copied
-          echo "Configuration copied:"
-          ls -la rpi-image-gen/config/
-          ls -la rpi-image-gen/layer/
-      
-      - name: Build RPi image
-        id: build-image
-        env:
-          FIRST_USER_NAME: pi
-          FIRST_USER_PASS: raspberry
-          IMAGE_VARIANT_INPUT: ${{ github.event.inputs.image_variant }}
-        run: |
-          cd rpi-image-gen
-          
-          # Determine which NetAlertX image to use (default to dev)
-          IMAGE_VARIANT="${IMAGE_VARIANT_INPUT:-dev}"
-          if [ "$IMAGE_VARIANT" = "production" ]; then
-            NETALERTX_IMAGE="ghcr.io/jokob-sk/netalertx:latest"
-            echo "Using NetAlertX PRODUCTION image: $NETALERTX_IMAGE"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VARIANT="${{ github.event.inputs.image_variant }}"
           else
-            NETALERTX_IMAGE="ghcr.io/jokob-sk/netalertx-dev:latest"
-            echo "Using NetAlertX DEV image: $NETALERTX_IMAGE"
+            VARIANT="dev"
           fi
           
-          # Set environment variables for user credentials if provided
-          # Use secrets for first user if provided, otherwise fallback to defaults
-          IGUSER="${FIRST_USER_NAME:-pi}"
-          IGPASS="${FIRST_USER_PASS:-raspberry}"
-          export IGconf_device_user1="${IGUSER}"
-          export IGconf_device_pass1="${IGPASS}"
-          export IGconf_docker_trust_user1="y"
-          export IGconf_netalertx_image="$NETALERTX_IMAGE"
-          export IGconf_netalertx_port="20211"
-          
-          # Create and set the APT key directory required by docker layer
-          # Use absolute path from current working directory
-          APT_KEY_DIR="$(pwd)/apt-keys"
-          mkdir -p "$APT_KEY_DIR"
-          export IGconf_sys_apt_keydir="$APT_KEY_DIR"
-          echo "IGconf_sys_apt_keydir set to: $IGconf_sys_apt_keydir"
-          
-          echo "Default user '$IGconf_device_user1' will be created."
-          echo "Use RPi Imager advanced options to override credentials."
-          
-          # Show available layers
-          echo "Available layers:"
-          ./rpi-image-gen layer --list | head -20
-          
-          # Build the image
-          echo "Starting image build..."
-          ./rpi-image-gen build -c ./config/netalertx.yaml -S . || {
-            echo "❌ Build failed. Checking for logs..."
-            find . -name "*.log" -exec echo "=== {} ===" \; -exec cat {} \;
-            exit 1
-          }
-          
-          # Find the generated image in the deploy directory
-          DEPLOY_DIR=$(find ./work -type d -name "deploy-*" | head -n 1)
-          echo "Deploy directory: $DEPLOY_DIR"
-          
-          if [ -z "$DEPLOY_DIR" ]; then
-            echo "❌ Error: No deploy directory found"
-            echo "Checking work directory structure:"
-            find ./work -type d
-            exit 1
+          if [ "$VARIANT" = "production" ]; then
+            echo "NETALERTX_IMAGE=ghcr.io/jokob-sk/netalertx:latest" >> $GITHUB_OUTPUT
+          else
+            echo "NETALERTX_IMAGE=ghcr.io/jokob-sk/netalertx-dev:latest" >> $GITHUB_OUTPUT
           fi
           
-          # The main bootable image should be in the deploy directory
-          IMAGE_PATH=$(find "$DEPLOY_DIR" -maxdepth 1 -name "*.img" -type f ! -name "*.sparse" | head -n 1)
-          echo "✅ Generated image: $IMAGE_PATH"
-          
-          if [ -z "$IMAGE_PATH" ]; then
-            echo "❌ Error: No .img file found in deploy directory"
-            echo "Contents of deploy directory:"
-            ls -lh "$DEPLOY_DIR"
-            exit 1
-          fi
-          
-          # Get image info
-          ls -lh "$IMAGE_PATH"
-          
-          # Create filename with build date
-          BUILD_DATE=$(date +'%Y-%m-%d')
-          IMAGE_NAME="netalertx-rpi-${BUILD_DATE}.img"
-          
-          # Move to workspace root with dated filename
-          cp "$IMAGE_PATH" "../${IMAGE_NAME}"
-          echo "IMAGE_NAME=${IMAGE_NAME}" >> $GITHUB_ENV
-          # Export step output so later steps can reference this file name
-          echo "IMAGE_NAME=${IMAGE_NAME}" >> $GITHUB_OUTPUT
-      
-      - name: Compress image with gzip
-        id: compress-image
-        env:
-          IMAGE_NAME: ${{ steps.build-image.outputs.IMAGE_NAME }}
-        run: |
-          echo "Compressing image with gzip..."
-          gzip -9 -v "${IMAGE_NAME}"
-          ls -lh "${IMAGE_NAME}.gz"
-          echo "ARCHIVE_NAME=${IMAGE_NAME}.gz" >> $GITHUB_OUTPUT
+          echo "Building with $VARIANT variant"
 
-      - name: Verify compressed archive
+      - name: Create custom stage for Docker installation
         run: |
-          ARCHIVE="${{ steps.compress-image.outputs.ARCHIVE_NAME }}"
-          echo "Checking for archive: $ARCHIVE"
-          if [ -z "$ARCHIVE" ]; then
-            echo "No archive name provided from compress step";
-            ls -lah . || true;
-            exit 1;
+          mkdir -p custom-stage-docker/00-install-docker
+          
+          cat > custom-stage-docker/00-install-docker/00-run.sh << 'EOF'
+          #!/bin/bash -e
+          on_chroot << CHROOT
+          # Install Docker using official script
+          curl -fsSL https://get.docker.com | sh
+          
+          # Enable Docker service
+          systemctl enable docker.service
+          CHROOT
+          EOF
+          
+          chmod +x custom-stage-docker/00-install-docker/00-run.sh
+          
+          cat > custom-stage-docker/prerun.sh << 'EOF'
+          #!/bin/bash -e
+          if [ ! -d "${ROOTFS_DIR}" ]; then
+            copy_previous
           fi
-          if [ ! -f "$ARCHIVE" ]; then
-            echo "Archive file not found: $ARCHIVE";
-            ls -lah . || true;
-            exit 1;
-          fi
-          echo "Archive verified: $ARCHIVE";
+          EOF
+          
+          chmod +x custom-stage-docker/prerun.sh
 
-      - name: Upload image artifact
-        uses: actions/upload-artifact@v4
+      - name: Create custom stage for NetAlertX
+        run: |
+          mkdir -p custom-stage-netalertx/00-setup-netalertx
+          
+          cat > custom-stage-netalertx/00-setup-netalertx/00-run.sh << 'EOFMAIN'
+          #!/bin/bash -e
+          
+          NETALERTX_IMAGE="${{ steps.set-image.outputs.NETALERTX_IMAGE }}"
+          
+          on_chroot << 'CHROOT'
+          # Create NetAlertX directory
+          mkdir -p /opt/netalertx
+          
+          # Create docker-compose.yml
+          cat > /opt/netalertx/docker-compose.yml << 'EOF'
+          services:
+            netalertx:
+              container_name: netalertx
+              image: ${NETALERTX_IMAGE}
+              network_mode: host
+              restart: unless-stopped
+              read_only: true
+              volumes:
+                - netalertx_data:/app/config
+              environment:
+                - TZ=UTC
+                - PORT=20211
+              cap_drop:
+                - ALL
+              cap_add:
+                - NET_ADMIN
+                - NET_RAW
+                - NET_BIND_SERVICE
+              deploy:
+                resources:
+                  limits:
+                    memory: 2048M
+                  reservations:
+                    memory: 1024M
+
+          volumes:
+            netalertx_data:
+              driver: local
+          EOF
+          
+          # Create systemd service
+          cat > /etc/systemd/system/netalertx.service << 'EOF'
+          [Unit]
+          Description=NetAlertX Network Scanner
+          Requires=docker.service
+          After=docker.service
+          
+          [Service]
+          Type=simple
+          WorkingDirectory=/opt/netalertx
+          Environment="NETALERTX_IMAGE=${NETALERTX_IMAGE}"
+          ExecStartPre=-/usr/bin/docker compose pull
+          ExecStart=/usr/bin/docker compose up
+          ExecStop=/usr/bin/docker compose down
+          Restart=always
+          RestartSec=10
+          
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+          
+          # Enable the service
+          systemctl enable netalertx.service
+          CHROOT
+          EOFMAIN
+          
+          chmod +x custom-stage-netalertx/00-setup-netalertx/00-run.sh
+          
+          cat > custom-stage-netalertx/prerun.sh << 'EOF'
+          #!/bin/bash -e
+          if [ ! -d "${ROOTFS_DIR}" ]; then
+            copy_previous
+          fi
+          EOF
+          
+          chmod +x custom-stage-netalertx/prerun.sh
+
+      - name: Build Raspberry Pi OS image with pi-gen
+        id: build
+        uses: usimd/pi-gen-action@v1
         with:
-          name: netalertx-image
-          path: ${{ steps.compress-image.outputs.ARCHIVE_NAME }}
-      
-      - name: Generate release tag
-        id: tag
+          image-name: netalertx-rpi-${{ steps.set-image.outputs.NETALERTX_IMAGE == 'ghcr.io/jokob-sk/netalertx:latest' && 'production' || 'dev' }}
+          stage-list: stage0 stage1 stage2 custom-stage-docker custom-stage-netalertx
+          hostname: netalertx
+          username: pi
+          password: raspberry
+          locale: en_US.UTF-8
+          keyboard-layout: English (US)
+          keyboard-keymap: us
+          timezone: UTC
+          verbose-output: true
+
+      - name: Compress image
+        id: compress
         run: |
-          TAG="v$(date +'%Y.%m.%d')-$(git rev-parse --short HEAD)"
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "Release tag: $TAG"
-      
+          IMAGE_PATH="${{ steps.build.outputs.image-path }}"
+          BUILD_DATE=$(date +%Y-%m-%d)
+          OUTPUT_NAME="netalertx-rpi-${BUILD_DATE}.img.gz"
+          
+          echo "Compressing $IMAGE_PATH to $OUTPUT_NAME"
+          gzip -c "$IMAGE_PATH" > "$OUTPUT_NAME"
+          
+          echo "output-file=$OUTPUT_NAME" >> $GITHUB_OUTPUT
+          echo "build-date=$BUILD_DATE" >> $GITHUB_OUTPUT
+
       - name: Create Release
+        id: create_release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ steps.tag.outputs.tag }}
-          name: NetAlertX RPi Image ${{ steps.tag.outputs.tag }}
+          tag_name: v${{ steps.compress.outputs.build-date }}
+          name: NetAlertX RPi Image ${{ steps.compress.outputs.build-date }}
           body: |
-            # NetAlertX Raspberry Pi Image
+            ## Raspberry Pi OS Image with NetAlertX Pre-configured
             
-            Raspberry Pi OS 64-bit image for Zero 2W and newer devices, pre-configured with Docker and NetAlertX.
+            **Build Date:** ${{ steps.compress.outputs.build-date }}
+            **NetAlertX Variant:** ${{ steps.set-image.outputs.NETALERTX_IMAGE }}
             
-            ## Installation
+            ### Features
+            - 64-bit Raspberry Pi OS (Bookworm)
+            - Docker & Docker Compose pre-installed
+            - NetAlertX configured to start automatically
+            - Default credentials: pi/raspberry
+            - Compatible with Raspberry Pi Imager configuration
             
-            In Raspberry Pi Imager:
-            1. Select your Raspberry Pi
-            2. Select the downloaded image: Operating System -> Use Custom -> the downloaded file
-            3. Select the SD card to flash
-            4. Press Next and proceed through the process
+            ### Installation
+            1. Download the .img.gz file below
+            2. Flash with Raspberry Pi Imager
+            3. Configure username/password in RPi Imager (recommended)
+            4. Boot and access NetAlertX at http://<pi-ip>:20211
             
-            ## First Boot
-            
-            - Default user: `pi`
-            - Default password: `raspberry` (change immediately using `passwd` command)
-            - NetAlertX starts automatically and is accessible at http://&lt;pi-ip&gt;:20211
-            - Data persists at /opt/netalertx/data
-            
-            ## What's Included
-            
-            - Raspberry Pi OS (64-bit)
-            - Docker & Docker Compose
-            - NetAlertX (jokob-sk/netalertx:latest) configured to start on boot
-            
-            Built from commit: ${{ github.sha }}
-          files: |
-            ${{ steps.compress-image.outputs.ARCHIVE_NAME }}
+            ### Notes
+            - NetAlertX pulls the Docker image on first boot
+            - Change the default password if not configured in RPi Imager
+          files: ${{ steps.compress.outputs.output-file }}
           draft: false
           prerelease: false

@@ -70,29 +70,25 @@ To trigger manually with production image:
 
 You can customize the image by modifying:
 
-- `config/netalertx.yaml` - Main configuration file
-- `layer/netalertx.yaml` - NetAlertX layer configuration
-- `.github/workflows/build-image.yml` - Build workflow
+- `.github/workflows/build-image.yml` - Build workflow and custom stage configuration
 
 ## How It Works
 
-The build process uses [rpi-image-gen](https://github.com/raspberrypi/rpi-image-gen), the official Raspberry Pi Foundation tool for creating custom images:
+The build process uses [pi-gen-action](https://github.com/usimd/pi-gen-action), a GitHub Action wrapper for the official Raspberry Pi Foundation's pi-gen tool:
 
-1. GitHub Actions runner installs dependencies (qemu, mmdebstrap, etc.)
-2. Clones rpi-image-gen repository
-3. Applies custom configuration and layers
-4. Builds the image using Raspberry Pi OS base
-5. Adds Docker layer (`docker-debian-bookworm`)
-6. Applies NetAlertX custom layer:
-   - Enables docker.service
+1. GitHub Actions runner prepares custom stage for NetAlertX
+2. Custom stage includes two substages:
+   - Install Docker using official Docker installation script
+   - Setup NetAlertX with docker-compose and systemd service
+3. Builds the image using Raspberry Pi OS base with custom stages
+4. NetAlertX configuration:
    - Creates docker-compose.yml at /opt/netalertx with read-only container
-   - Pre-pulls NetAlertX Docker image from GitHub Container Registry
    - Uses dev (ghcr.io/jokob-sk/netalertx-dev:latest) or production (ghcr.io/jokob-sk/netalertx:latest) variant
    - Creates systemd service to run NetAlertX with Docker Compose
    - Uses Docker named volume for persistent data
    - Configures auto-start on boot
-7. Compresses the final image with gzip
-8. Creates a GitHub Release with the compressed image
+5. Compresses the final image with gzip
+6. Creates a GitHub Release with the compressed image
 
 ## NetAlertX Configuration
 
