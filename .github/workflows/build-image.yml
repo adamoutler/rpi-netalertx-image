@@ -52,7 +52,7 @@ jobs:
           keyboard-layout: English (US)
           keyboard-keymap: us
           timezone: Etc/UTC
-          verbose-output: true
+          verbose-output: false
         env:
           NETALERTX_IMAGE: ${{ steps.set-variant.outputs.image }}
 
