@@ -22,137 +22,27 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set NetAlertX image based on variant
-        id: set-image
+      - name: Set NetAlertX image variant
+        id: set-variant
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VARIANT="${{ github.event.inputs.image_variant }}"
-          else
-            VARIANT="dev"
-          fi
+          VARIANT="${{ github.event.inputs.image_variant || 'dev' }}"
           
           if [ "$VARIANT" = "production" ]; then
-            echo "NETALERTX_IMAGE=ghcr.io/jokob-sk/netalertx:latest" >> $GITHUB_OUTPUT
+            IMAGE="ghcr.io/jokob-sk/netalertx:latest"
           else
-            echo "NETALERTX_IMAGE=ghcr.io/jokob-sk/netalertx-dev:latest" >> $GITHUB_OUTPUT
+            IMAGE="ghcr.io/jokob-sk/netalertx-dev:latest"
           fi
           
-          echo "Building with $VARIANT variant"
+          echo "variant=$VARIANT" >> $GITHUB_OUTPUT
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+          echo "Building with $VARIANT variant: $IMAGE"
 
-      - name: Create custom stage for Docker installation
-        run: |
-          mkdir -p custom-stage-docker/00-install-docker
-          
-          cat > custom-stage-docker/00-install-docker/00-run.sh << 'EOF'
-          #!/bin/bash -e
-          on_chroot << CHROOT
-          # Install Docker using official script
-          curl -fsSL https://get.docker.com | sh
-          
-          # Enable Docker service
-          systemctl enable docker.service
-          CHROOT
-          EOF
-          
-          chmod +x custom-stage-docker/00-install-docker/00-run.sh
-          
-          cat > custom-stage-docker/prerun.sh << 'EOF'
-          #!/bin/bash -e
-          if [ ! -d "${ROOTFS_DIR}" ]; then
-            copy_previous
-          fi
-          EOF
-          
-          chmod +x custom-stage-docker/prerun.sh
-
-      - name: Create custom stage for NetAlertX
-        run: |
-          mkdir -p custom-stage-netalertx/00-setup-netalertx
-          
-          cat > custom-stage-netalertx/00-setup-netalertx/00-run.sh << 'EOFMAIN'
-          #!/bin/bash -e
-          
-          NETALERTX_IMAGE="${{ steps.set-image.outputs.NETALERTX_IMAGE }}"
-          
-          on_chroot << 'CHROOT'
-          # Create NetAlertX directory
-          mkdir -p /opt/netalertx
-          
-          # Create docker-compose.yml
-          cat > /opt/netalertx/docker-compose.yml << 'EOF'
-          services:
-            netalertx:
-              container_name: netalertx
-              image: ${NETALERTX_IMAGE}
-              network_mode: host
-              restart: unless-stopped
-              read_only: true
-              volumes:
-                - netalertx_data:/app/config
-              environment:
-                - TZ=UTC
-                - PORT=20211
-              cap_drop:
-                - ALL
-              cap_add:
-                - NET_ADMIN
-                - NET_RAW
-                - NET_BIND_SERVICE
-              deploy:
-                resources:
-                  limits:
-                    memory: 2048M
-                  reservations:
-                    memory: 1024M
-
-          volumes:
-            netalertx_data:
-              driver: local
-          EOF
-          
-          # Create systemd service
-          cat > /etc/systemd/system/netalertx.service << 'EOF'
-          [Unit]
-          Description=NetAlertX Network Scanner
-          Requires=docker.service
-          After=docker.service
-          
-          [Service]
-          Type=simple
-          WorkingDirectory=/opt/netalertx
-          Environment="NETALERTX_IMAGE=${NETALERTX_IMAGE}"
-          ExecStartPre=-/usr/bin/docker compose pull
-          ExecStart=/usr/bin/docker compose up
-          ExecStop=/usr/bin/docker compose down
-          Restart=always
-          RestartSec=10
-          
-          [Install]
-          WantedBy=multi-user.target
-          EOF
-          
-          # Enable the service
-          systemctl enable netalertx.service
-          CHROOT
-          EOFMAIN
-          
-          chmod +x custom-stage-netalertx/00-setup-netalertx/00-run.sh
-          
-          cat > custom-stage-netalertx/prerun.sh << 'EOF'
-          #!/bin/bash -e
-          if [ ! -d "${ROOTFS_DIR}" ]; then
-            copy_previous
-          fi
-          EOF
-          
-          chmod +x custom-stage-netalertx/prerun.sh
-
-      - name: Build Raspberry Pi OS image with pi-gen
+      - name: Build Raspberry Pi OS image
         id: build
         uses: usimd/pi-gen-action@v1
         with:
-          image-name: netalertx-rpi-${{ steps.set-image.outputs.NETALERTX_IMAGE == 'ghcr.io/jokob-sk/netalertx:latest' && 'production' || 'dev' }}
-          stage-list: stage0 stage1 stage2 custom-stage-docker custom-stage-netalertx
+          image-name: netalertx-rpi
+          stage-list: stage0 stage1 stage2 stages/docker stages/netalertx
           hostname: netalertx
           username: pi
           password: raspberry
@@ -161,8 +51,10 @@ jobs:
           keyboard-keymap: us
           timezone: UTC
           verbose-output: true
+        env:
+          NETALERTX_IMAGE: ${{ steps.set-variant.outputs.image }}
 
-      - name: Compress image
+      - name: Compress and release image
         id: compress
         run: |
           IMAGE_PATH="${{ steps.build.outputs.image-path }}"
@@ -176,7 +68,6 @@ jobs:
           echo "build-date=$BUILD_DATE" >> $GITHUB_OUTPUT
 
       - name: Create Release
-        id: create_release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.compress.outputs.build-date }}
@@ -185,7 +76,7 @@ jobs:
             ## Raspberry Pi OS Image with NetAlertX Pre-configured
             
             **Build Date:** ${{ steps.compress.outputs.build-date }}
-            **NetAlertX Variant:** ${{ steps.set-image.outputs.NETALERTX_IMAGE }}
+            **NetAlertX Variant:** ${{ steps.set-variant.outputs.image }}
             
             ### Features
             - 64-bit Raspberry Pi OS (Bookworm)
@@ -203,6 +94,6 @@ jobs:
             ### Notes
             - NetAlertX pulls the Docker image on first boot
             - Change the default password if not configured in RPi Imager
-          files: ${{ steps.compress.outputs.output-file }}
+          files: netalertx-rpi-*.img.gz
           draft: false
           prerelease: false
