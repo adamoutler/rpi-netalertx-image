@@ -1,0 +1,99 @@
+name: Build RPi NetAlertX Image
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      image_variant:
+        description: 'NetAlertX image variant'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - production
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set NetAlertX image variant
+        id: set-variant
+        run: |
+          VARIANT="${{ github.event.inputs.image_variant || 'dev' }}"
+          
+          if [ "$VARIANT" = "production" ]; then
+            IMAGE="ghcr.io/jokob-sk/netalertx:latest"
+          else
+            IMAGE="ghcr.io/jokob-sk/netalertx-dev:latest"
+          fi
+          
+          echo "variant=$VARIANT" >> $GITHUB_OUTPUT
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+          echo "Building with $VARIANT variant: $IMAGE"
+
+      - name: Build Raspberry Pi OS image
+        id: build
+        uses: usimd/pi-gen-action@v1
+        with:
+          image-name: netalertx-rpi
+          stage-list: stage0 stage1 stage2 stages/docker stages/netalertx
+          hostname: netalertx
+          username: pi
+          password: raspberry
+          locale: en_US.UTF-8
+          keyboard-layout: English (US)
+          keyboard-keymap: us
+          timezone: UTC
+          verbose-output: true
+        env:
+          NETALERTX_IMAGE: ${{ steps.set-variant.outputs.image }}
+
+      - name: Compress and release image
+        id: compress
+        run: |
+          IMAGE_PATH="${{ steps.build.outputs.image-path }}"
+          BUILD_DATE=$(date +%Y-%m-%d)
+          OUTPUT_NAME="netalertx-rpi-${BUILD_DATE}.img.gz"
+          
+          echo "Compressing $IMAGE_PATH to $OUTPUT_NAME"
+          gzip -c "$IMAGE_PATH" > "$OUTPUT_NAME"
+          
+          echo "output-file=$OUTPUT_NAME" >> $GITHUB_OUTPUT
+          echo "build-date=$BUILD_DATE" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.compress.outputs.build-date }}
+          name: NetAlertX RPi Image ${{ steps.compress.outputs.build-date }}
+          body: |
+            ## Raspberry Pi OS Image with NetAlertX Pre-configured
+            
+            **Build Date:** ${{ steps.compress.outputs.build-date }}
+            **NetAlertX Variant:** ${{ steps.set-variant.outputs.image }}
+            
+            ### Features
+            - 64-bit Raspberry Pi OS (Bookworm)
+            - Docker & Docker Compose pre-installed
+            - NetAlertX configured to start automatically
+            - Default credentials: pi/raspberry
+            - Compatible with Raspberry Pi Imager configuration
+            
+            ### Installation
+            1. Download the .img.gz file below
+            2. Flash with Raspberry Pi Imager
+            3. Configure username/password in RPi Imager (recommended)
+            4. Boot and access NetAlertX at http://<pi-ip>:20211
+            
+            ### Notes
+            - NetAlertX pulls the Docker image on first boot
+            - Change the default password if not configured in RPi Imager
+          files: netalertx-rpi-*.img.gz
+          draft: false
+          prerelease: false
