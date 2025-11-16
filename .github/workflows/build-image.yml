@@ -49,7 +49,7 @@ jobs:
           locale: en_US.UTF-8
           keyboard-layout: English (US)
           keyboard-keymap: us
-          timezone: UTC
+          timezone: Etc/UTC
           verbose-output: true
         env:
           NETALERTX_IMAGE: ${{ steps.set-variant.outputs.image }}
