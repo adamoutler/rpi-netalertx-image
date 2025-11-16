@@ -3,6 +3,8 @@ name: Build RPi NetAlertX Image
 on:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
     inputs:
       image_variant:
@@ -68,6 +70,7 @@ jobs:
           echo "build-date=$BUILD_DATE" >> $GITHUB_OUTPUT
 
       - name: Create Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.compress.outputs.build-date }}
