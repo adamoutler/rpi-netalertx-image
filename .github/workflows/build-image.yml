@@ -61,25 +61,40 @@ jobs:
         run: |
           IMAGE_PATH="${{ steps.build.outputs.image-path }}"
           BUILD_DATE=$(date +%Y-%m-%d)
-          OUTPUT_NAME="netalertx-rpi-${BUILD_DATE}.img.gz"
+          
+          # Add unique identifier for PR builds
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            OUTPUT_NAME="netalertx-rpi-pr${{ github.event.pull_request.number }}-${BUILD_DATE}-${{ github.run_number }}.img.gz"
+            TAG_NAME="pr${{ github.event.pull_request.number }}-${BUILD_DATE}-${{ github.run_number }}"
+            RELEASE_NAME="NetAlertX RPi Image (PR #${{ github.event.pull_request.number }}) ${BUILD_DATE}"
+            IS_PRERELEASE="true"
+          else
+            OUTPUT_NAME="netalertx-rpi-${BUILD_DATE}.img.gz"
+            TAG_NAME="v${BUILD_DATE}"
+            RELEASE_NAME="NetAlertX RPi Image ${BUILD_DATE}"
+            IS_PRERELEASE="false"
+          fi
           
           echo "Compressing $IMAGE_PATH to $OUTPUT_NAME"
           gzip -c "$IMAGE_PATH" > "$OUTPUT_NAME"
           
           echo "output-file=$OUTPUT_NAME" >> $GITHUB_OUTPUT
           echo "build-date=$BUILD_DATE" >> $GITHUB_OUTPUT
+          echo "tag-name=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "release-name=$RELEASE_NAME" >> $GITHUB_OUTPUT
+          echo "is-prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
 
       - name: Create Release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ steps.compress.outputs.build-date }}
-          name: NetAlertX RPi Image ${{ steps.compress.outputs.build-date }}
+          tag_name: ${{ steps.compress.outputs.tag-name }}
+          name: ${{ steps.compress.outputs.release-name }}
           body: |
             ## Raspberry Pi OS Image with NetAlertX Pre-configured
             
             **Build Date:** ${{ steps.compress.outputs.build-date }}
             **NetAlertX Variant:** ${{ steps.set-variant.outputs.image }}
+            **Build Type:** ${{ github.event_name }}
             
             ### Features
             - 64-bit Raspberry Pi OS (Bookworm)
@@ -99,4 +114,4 @@ jobs:
             - Change the default password if not configured in RPi Imager
           files: netalertx-rpi-*.img.gz
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.compress.outputs.is-prerelease }}
