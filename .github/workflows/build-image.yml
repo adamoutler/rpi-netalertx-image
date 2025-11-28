@@ -45,14 +45,10 @@ jobs:
         with:
           image-name: netalertx-rpi
           stage-list: stage0 stage1 stage2 stages/docker stages/netalertx
-          hostname: netalertx
-          username: pi
-          password: raspberry
-          locale: en_US.UTF-8
-          keyboard-layout: English (US)
-          keyboard-keymap: us
-          timezone: Etc/UTC
           verbose-output: false
+          # User-configurable settings (hostname, username, password, locale, 
+          # keyboard, timezone, WiFi) are intentionally omitted to allow
+          # Raspberry Pi Imager to configure them at flash time
         env:
           NETALERTX_IMAGE: ${{ steps.set-variant.outputs.image }}
 
@@ -100,18 +96,19 @@ jobs:
             - 64-bit Raspberry Pi OS (Bookworm)
             - Docker & Docker Compose pre-installed
             - NetAlertX configured to start automatically
-            - Default credentials: pi/raspberry
             - Compatible with Raspberry Pi Imager configuration
             
             ### Installation
             1. Download the .img.gz file below
             2. Flash with Raspberry Pi Imager
-            3. Configure username/password in RPi Imager (recommended)
+            3. **IMPORTANT**: Click the gear icon (⚙️) in RPi Imager to configure:
+               - Username and password (required)
+               - Hostname, WiFi, locale, timezone (optional)
             4. Boot and access NetAlertX at http://<pi-ip>:20211
             
             ### Notes
-            - NetAlertX pulls the Docker image on first boot
-            - Change the default password if not configured in RPi Imager
+            - User configuration is handled by Raspberry Pi Imager at flash time
+            - No default credentials - you must configure them in RPi Imager
           files: netalertx-rpi-*.img.gz
           draft: false
           prerelease: ${{ steps.compress.outputs.is-prerelease }}
