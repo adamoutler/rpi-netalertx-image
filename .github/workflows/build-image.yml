@@ -58,18 +58,19 @@ jobs:
         id: compress
         run: |
           IMAGE_PATH="${{ steps.build.outputs.image-path }}"
+          BUILD_TIMESTAMP=$(date +%Y-%m-%d-%H%M%S)
           BUILD_DATE=$(date +%Y-%m-%d)
           
-          # Add unique identifier for PR builds
+          # Add unique identifier for PR builds using full timestamp
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            OUTPUT_NAME="netalertx-rpi-pr${{ github.event.pull_request.number }}-${BUILD_DATE}-${{ github.run_number }}.img.gz"
-            TAG_NAME="pr${{ github.event.pull_request.number }}-${BUILD_DATE}-${{ github.run_number }}"
-            RELEASE_NAME="NetAlertX RPi Image (PR #${{ github.event.pull_request.number }}) ${BUILD_DATE}"
+            OUTPUT_NAME="netalertx-rpi-pr${{ github.event.pull_request.number }}-${BUILD_TIMESTAMP}.img.gz"
+            TAG_NAME="pr${{ github.event.pull_request.number }}-${BUILD_TIMESTAMP}"
+            RELEASE_NAME="NetAlertX RPi Image (PR #${{ github.event.pull_request.number }}) ${BUILD_TIMESTAMP}"
             IS_PRERELEASE="true"
           else
-            OUTPUT_NAME="netalertx-rpi-${BUILD_DATE}.img.gz"
-            TAG_NAME="v${BUILD_DATE}"
-            RELEASE_NAME="NetAlertX RPi Image ${BUILD_DATE}"
+            OUTPUT_NAME="netalertx-rpi-${BUILD_TIMESTAMP}.img.gz"
+            TAG_NAME="v${BUILD_TIMESTAMP}"
+            RELEASE_NAME="NetAlertX RPi Image ${BUILD_TIMESTAMP}"
             IS_PRERELEASE="false"
           fi
           
@@ -77,7 +78,7 @@ jobs:
           gzip -c "$IMAGE_PATH" > "$OUTPUT_NAME"
           
           echo "output-file=$OUTPUT_NAME" >> $GITHUB_OUTPUT
-          echo "build-date=$BUILD_DATE" >> $GITHUB_OUTPUT
+          echo "build-date=$BUILD_TIMESTAMP" >> $GITHUB_OUTPUT
           echo "tag-name=$TAG_NAME" >> $GITHUB_OUTPUT
           echo "release-name=$RELEASE_NAME" >> $GITHUB_OUTPUT
           echo "is-prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT

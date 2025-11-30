@@ -1,15 +1,18 @@
 #!/bin/bash -e
 
-on_chroot << 'CHROOT'
+# Get the NetAlertX image from environment variable (set during build)
+NETALERTX_IMAGE_NAME="${NETALERTX_IMAGE:-ghcr.io/jokob-sk/netalertx-dev:latest}"
+
+on_chroot << CHROOT
 # Create NetAlertX directory
 mkdir -p /opt/netalertx
 
-# Create docker-compose.yml
-cat > /opt/netalertx/docker-compose.yml << 'EOF'
+# Create docker-compose.yml with hardcoded image name
+cat > /opt/netalertx/docker-compose.yml << EOF
 services:
   netalertx:
     container_name: netalertx
-    image: ${NETALERTX_IMAGE}
+    image: ${NETALERTX_IMAGE_NAME}
     network_mode: host
     restart: unless-stopped
     read_only: true
@@ -46,7 +49,6 @@ After=docker.service
 [Service]
 Type=simple
 WorkingDirectory=/opt/netalertx
-Environment="NETALERTX_IMAGE=${NETALERTX_IMAGE}"
 ExecStartPre=-/usr/bin/docker compose pull
 ExecStart=/usr/bin/docker compose up
 ExecStop=/usr/bin/docker compose down
@@ -59,4 +61,8 @@ EOF
 
 # Enable the service
 systemctl enable netalertx.service
+
+# Pre-pull the NetAlertX Docker image for offline use
+echo "Pre-pulling NetAlertX Docker image: ${NETALERTX_IMAGE_NAME}"
+docker pull "${NETALERTX_IMAGE_NAME}"
 CHROOT
