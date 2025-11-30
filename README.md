@@ -26,14 +26,14 @@ Automated Raspberry Pi OS image builder with Docker and NetAlertX pre-configured
 2. Select the downloaded image: Operating System -> Use Custom -> the downloaded file
 3. Select the SD card to flash
 4. **IMPORTANT**: Click the gear icon (⚙️) or press Ctrl+Shift+X to configure:
-   - **Set username and password** (strongly recommended to override defaults)
+   - **Set username and password** (required - no default credentials)
    - Configure WiFi credentials (optional)
    - Configure hostname (optional)
    - Enable SSH if desired (optional)
 5. Press Next and proceed through the process
 
 3. Boot your Raspberry Pi
-4. Login with the username/password you configured in RPi Imager (or use defaults: pi/raspberry)
+4. Login with the username/password you configured in RPi Imager
 5. NetAlertX will start automatically and be accessible at `http://<pi-ip>:20211` within seconds
 
 ### Build Your Own
@@ -61,8 +61,8 @@ To trigger manually with production image:
 - **Root Partition**: 2GB (auto-expands on first boot)
 - **Docker**: Latest from Docker CE repository
 - **Docker Compose**: Included as Docker plugin
-- **Authentication**: Default user: `pi`, password: `raspberry`
-- **IMPORTANT**: Use the Raspberry Pi Imager gear icon (⚙️) to set your own username, password, and WiFi. This will override the default.
+- **Authentication**: Configured via Raspberry Pi Imager (no default credentials)
+- **IMPORTANT**: Use the Raspberry Pi Imager gear icon (⚙️) to set your own username, password, and WiFi before flashing
 - **First Boot**: Raspberry Pi Imager settings are applied automatically (username, password, WiFi, hostname, SSH)
 - **NetAlertX Data**: Stored in Docker named volume `netalertx_data`
 
@@ -125,7 +125,7 @@ After booting the image:
 
 ## Security Notes
 
-- **Configure credentials in Raspberry Pi Imager** - The image has defaults (pi/raspberry), but you should override them using Raspberry Pi Imager configuration
+- **Configure credentials in Raspberry Pi Imager** - The image has no default credentials; you must configure them using Raspberry Pi Imager before flashing
 - **Read-only container** - NetAlertX runs in a read-only container for enhanced security
 - Docker service runs automatically and NetAlertX has host network access for ARP scanning
 - NetAlertX data is persisted in Docker named volume `netalertx_data`
